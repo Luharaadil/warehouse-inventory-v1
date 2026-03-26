@@ -1,0 +1,744 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Container MM INFO (貨櫃管理資訊)</title>
+    <style>
+        :root {
+            --primary-color: #4CAF50; --bg-color: #f7f9fc; --card-bg: #ffffff;
+            --danger-color: #e53935; --copy-color: #FF9800; --view-color: #212121;
+            --frame-color: #4CAF50; --input-border: #ddd;
+        }
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            background-color: var(--bg-color); margin: 0; padding: 0;
+            display: flex; justify-content: center; min-height: 100vh;
+        }
+        #status-modal, #settings-modal {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.6); z-index: 9999;
+            display: none; align-items: center; justify-content: center;
+        }
+        .modal-box {
+            background: white; padding: 25px; border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1); text-align: center; width: 90%; max-width: 450px;
+            max-height: 90vh; overflow-y: auto; 
+        }
+        .login-input {
+            width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ccc; 
+            border-radius: 8px; font-size: 16px; text-align: left; box-sizing: border-box;
+        }
+        .spinner {
+            border: 4px solid #f3f3f3; border-top: 4px solid var(--primary-color);
+            border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite;
+            margin: 0 auto 15px auto;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        #app-screen { width: 100%; max-width: 500px; padding: 10px; box-sizing: border-box; transition: max-width 0.3s ease; }
+        
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .header-btn { 
+            font-size: 24px; cursor: pointer; color: #555; padding: 6px; 
+            border-radius: 50%; transition: background 0.2s; width: 36px; height: 36px; 
+            display: flex; align-items: center; justify-content: center;
+        }
+        .header-title { flex: 1; text-align: center; } 
+        .header-title h2 { margin: 0; color: #333; font-size: 1.6rem; line-height: 1.3; font-weight: 800; }
+
+        .card { background: var(--card-bg); padding: 15px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); margin-bottom: 12px; }
+        .section-title { font-weight: bold; color: #555; margin-bottom: 8px; display: block; font-size: 1rem; }
+        .photo-controls { display: flex; gap: 10px; margin-bottom: 10px; }
+        .btn-half { flex: 1; padding: 10px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; color: white; display: flex; align-items: center; justify-content: center; gap: 5px;}
+        .btn-cam { background-color: #FF5722; color: white; } 
+        .btn-gallery { background-color: #FFC107; color: #333; } 
+        
+        .preview-container-box {
+            max-width: 100%; height: auto; position: relative; display: flex; justify-content: center; align-items: center; overflow: hidden;
+            background: #e0e0e0; border-radius: 8px; min-height: 150px; cursor: pointer;
+        }
+        .ratio-4-3 { aspect-ratio: 4 / 3; } .ratio-16-9 { aspect-ratio: 16 / 9; } .ratio-9-16 { aspect-ratio: 9 / 16; } .ratio-1-1 { aspect-ratio: 1 / 1; }
+        
+        .preview-container-box .placeholder { position: absolute; color: #666; font-size: 1.1em; font-weight: bold; text-align: center; }
+        .preview-img-display { max-width: 100%; max-height: 100%; width: auto; height: auto; object-fit: cover; display: none; }
+        .ratio-tag { position: absolute; bottom: 5px; right: 5px; background: rgba(0,0,0,0.6); color: white; padding: 2px 5px; border-radius: 4px; font-size: 0.7rem; z-index: 10; }
+        
+        .input-group { margin-bottom: 8px; display: flex; flex-direction: column; }
+        .input-label { font-weight: bold; font-size: 0.9rem; color: #333; margin-bottom: 4px; }
+        .text-input, textarea, select.text-input { 
+            width: 100%; padding: 10px; border: 1px solid var(--input-border); 
+            border-radius: 6px; font-size: 15px; box-sizing: border-box; font-family: inherit; transition: border-color 0.3s;
+        }
+        textarea { height: 80px; resize: vertical; } 
+        .time-component { display: flex; flex-direction: column; margin-bottom: 8px; }
+        .time-input-row { display: flex; align-items: center; gap: 5px; }
+        .btn-update-time { padding: 10px 12px; border: none; background-color: #00bcd4; color: white; border-radius: 6px; cursor: pointer; font-weight: bold; line-height: 1; }
+        
+        .total-time-input-group { display: flex; gap: 5px; align-items: center; }
+        .total-time-input-group #input-total-time { flex-grow: 1; }
+        .total-time-input-group .btn-calc { padding: 10px; background: #607D8B; color: white; border: none; border-radius: 6px; cursor: pointer; }
+        .total-time-input-group #total-time-unit { width: 75px !important; }
+        
+        .footer-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px; padding-bottom: 20px; }
+        .btn-main { 
+            width: 100%; 
+            height: 65px; 
+            padding: 5px; border: none; border-radius: 8px; 
+            font-size: 18px; 
+            font-weight: 700; cursor: pointer; color: white; 
+            transition: background 0.2s, transform 0.1s; 
+            display: flex; flex-direction: column; 
+            align-items: center; justify-content: center; 
+            line-height: 1.1; text-align: center;
+            white-space: nowrap; 
+            overflow: hidden;    
+        }
+        .btn-main:active { transform: scale(0.99); }
+        .btn-save { background-color: var(--primary-color); } .btn-copy { background-color: var(--copy-color); }
+        .btn-view { background-color: #03A9F4; } .btn-drive { background-color: #795548; }
+
+        #recent-records-container { margin-top: 20px; padding: 15px; background: var(--card-bg); border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+        #recent-records-container h4 {
+            margin: 0 0 10px 0; color: var(--view-color); border-bottom: 1px solid #eee; padding-bottom: 8px;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .record-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 5px; cursor: pointer; border-bottom: 1px dashed #f0f0f0; transition: background-color 0.2s; }
+        .record-item:last-child { border-bottom: none; } .record-item:hover { background-color: #f9f9f9; }
+        .record-item .main-info-group { display: flex; flex-direction: column; gap: 2px; flex-shrink: 0; width: 45%; }
+        .record-item .form-no-display { font-weight: bold; color: var(--copy-color); font-size: 1.1em; }
+        .record-item .stop-time-display { font-weight: bold; color: #333; font-size: 0.9em; }
+        .record-item .details { font-size: 0.85rem; color: #777; text-align: right; line-height: 1.4; width: 55%; }
+        .hidden { display: none !important; }
+        
+        .btn-voice.recording { background-color: var(--danger-color); color: white; animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.8; } 100% { opacity: 1; } }
+
+        @media (min-width: 900px) {
+            #app-screen { max-width: 1100px; }
+            .main-content-wrapper { display: flex; gap: 20px; align-items: flex-start; }
+            .left-photo-column { flex: 2; display: flex; flex-direction: column; gap: 15px; }
+            .right-info-column { flex: 3; }
+            .left-photo-column .card { margin-bottom: 0; }
+            .right-info-column .card:first-child { margin-top: 0; }
+        }
+    </style>
+</head>
+<body>
+    <div id="status-modal" style="display: none;">
+        <div class="modal-box">
+            <div id="status-spinner" class="spinner"></div>
+            <div id="status-icon" class="status-icon" style="display:none; font-size: 40px;"></div>
+            <h3 id="status-text" style="color:#333; margin:0;">Uploading...</h3>
+            <p id="status-subtext" style="color:#666; font-size:0.9em; margin-top:5px;">(資料上傳中...)</p>
+            <button id="status-close-btn" onclick="closeStatusModal()" class="btn-main btn-view" style="margin-top: 15px; display: none;">OK</button>
+        </div>
+    </div>
+    
+    <div id="settings-modal" style="display: none;">
+        <div class="modal-box">
+            <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid #eee; padding-bottom: 10px;">
+                <h3>Settings (設定)</h3>
+                <button onclick="closeSettings()" style="background:none; border:none; font-size:1.5rem; cursor:pointer;">&times;</button>
+            </div>
+            <div class="settings-content-group">
+                <div class="modal-group">
+                    <label style="font-weight: bold; margin-bottom: 5px; display: block;">1. Voice Timeout (秒)</label>
+                    <input type="number" id="set-timeout" class="login-input" style="margin: 0;" placeholder="Default: 1.5">
+                </div>
+                <div class="modal-group">
+                    <label style="font-weight: bold; margin-bottom: 5px; display: block;">2. Photo Ratio</label>
+                    <select id="set-ratio" class="login-input" style="margin: 0;">
+                        <option value="4/3">4:3</option><option value="16/9">16:9</option><option value="9/16">9:16</option><option value="1/1">1:1</option>
+                    </select>
+                </div>
+                <div class="modal-group">
+                    <label style="font-weight: bold; margin-bottom: 5px; display: block;">3. Recent Records Limit (顯示筆數)</label>
+                    <input type="number" id="set-recent-limit" class="login-input" style="margin: 0;" placeholder="Default: 5" min="1" max="30">
+                </div>
+                <div class="modal-group">
+                    <label style="font-weight: bold; margin-bottom: 5px; display: block;">4. Voice Language</label>
+                    <select id="set-lang" class="login-input" style="margin: 0;" onchange="syncLanguage()">
+                        <option value="cmn-Hant-TW">Chinese (TW)</option><option value="en-US">English</option><option value="ja-JP">Japanese</option><option value="hi-IN">Hindi</option>
+                    </select>
+                </div>
+            </div>
+            <button class="btn-main btn-save" onclick="saveSettings()" style="margin-top:15px;">Save Settings</button>
+        </div>
+    </div>
+
+    <div id="app-screen">
+        <div class="author-header">Author: DEREK LIN (v7.0)</div>
+        <div class="header">
+            <div style="width: 36px;"></div> 
+            <div class="header-title"><h2>Container MM INFO<br>貨櫃管理資訊</h2></div>
+            <div class="header-btn" onclick="openSettings()" title="Settings">⚙️</div>
+        </div>
+        <div class="input-group">
+            <label class="input-label">Employee ID (員工編號):</label>
+            <input type="text" id="input-employee-id" class="text-input" placeholder="儲存後不會清除">
+        </div>
+
+        <div class="main-content-wrapper">
+            
+            <div class="left-photo-column">
+                <div class="card">
+                    <span class="section-title">1. Truck Plate Photo (車牌號碼照片)</span>
+                    <div class="photo-controls">
+                        <button class="btn-half btn-cam" onclick="triggerFile('input-cam_1')">📷 Camera A</button>
+                        <button class="btn-half btn-gallery" onclick="triggerFile('input-gallery_1')">🖼️ Gallery A</button>
+                    </div>
+                    <div id="preview-container_1" class="preview-container-box ratio-4-3" onclick="triggerFile('input-cam_1')">
+                        <div class="ratio-tag" id="ratio-display-tag_1">Ratio: 4:3</div>
+                        <span id="placeholder_1" class="placeholder">Tap here for Photo A</span>
+                        <img id="preview-img_1" class="preview-img-display">
+                    </div>
+                    <input type="file" id="input-cam_1" accept="image/*" capture="environment" class="hidden" onchange="handleFile(this, 1)">
+                    <input type="file" id="input-gallery_1" accept="image/*" class="hidden" onchange="handleFile(this, 1)">
+                </div>
+
+                <div class="card">
+                    <span class="section-title">2. Material Photo (原材料照片)</span>
+                    <div class="photo-controls">
+                        <button class="btn-half btn-cam" onclick="triggerFile('input-cam_2')">📷 Camera B</button>
+                        <button class="btn-half btn-gallery" onclick="triggerFile('input-gallery_2')">🖼️ Gallery B</button>
+                    </div>
+                    <div id="preview-container_2" class="preview-container-box ratio-4-3" onclick="triggerFile('input-cam_2')">
+                        <div class="ratio-tag" id="ratio-display-tag_2">Ratio: 4:3</div>
+                        <span id="placeholder_2" class="placeholder">Tap here for Photo B</span>
+                        <img id="preview-img_2" class="preview-img-display">
+                    </div>
+                    <input type="file" id="input-cam_2" accept="image/*" capture="environment" class="hidden" onchange="handleFile(this, 2)">
+                    <input type="file" id="input-gallery_2" accept="image/*" class="hidden" onchange="handleFile(this, 2)">
+                </div>
+
+                <div class="card">
+                    <span class="section-title">3. Empty Container Photo (空櫃照片)</span>
+                    <div class="photo-controls">
+                        <button class="btn-half btn-cam" onclick="triggerFile('input-cam_3')">📷 Camera C</button>
+                        <button class="btn-half btn-gallery" onclick="triggerFile('input-gallery_3')">🖼️ Gallery C</button>
+                    </div>
+                    <div id="preview-container_3" class="preview-container-box ratio-4-3" onclick="triggerFile('input-cam_3')">
+                        <div class="ratio-tag" id="ratio-display-tag_3">Ratio: 4:3</div>
+                        <span id="placeholder_3" class="placeholder">Tap here for Photo C</span>
+                        <img id="preview-img_3" class="preview-img-display">
+                    </div>
+                    <input type="file" id="input-cam_3" accept="image/*" capture="environment" class="hidden" onchange="handleFile(this, 3)">
+                    <input type="file" id="input-gallery_3" accept="image/*" class="hidden" onchange="handleFile(this, 3)">
+                </div>
+            </div>
+
+            <div class="right-info-column">
+                <div class="card" id="info-card">
+                    <span class="section-title">2. Container Information</span>
+                    
+                    <div class="input-group">
+                        <select id="voice-lang-select" class="text-input" onchange="syncLanguageToSettings(this)">
+                            <option value="cmn-Hant-TW">Chinese (TW) - 繁體中文</option>
+                            <option value="en-US">English - 英文</option>
+                            <option value="ja-JP">Japanese - 日文</option>
+                            <option value="hi-IN">Hindi - 印地語</option>
+                        </select>
+                    </div>
+
+                    <div class="input-group">
+                        <label class="input-label">SAP CODE (系統代碼):</label>
+                        <input type="text" id="input-machine" class="text-input" placeholder="輸入 SAP Code">
+                    </div>
+                    
+                    <div class="input-group">
+                        <label class="input-label">Material Name (材料名稱):</label>
+                        <input type="text" id="input-form-no" class="text-input" placeholder="輸入材料名稱">
+                    </div>
+                    
+                    <div class="time-component">
+                        <label class="input-label">Arrival Time (到達時間): (DD/MM/YYYY hh:mm) (IST)</label>
+                        <div class="time-input-row">
+                            <input type="text" id="input-start-time-full" class="text-input" placeholder="請點右側按鈕或手動輸入" oninput="calculateTotalStopTime()">
+                            <button type="button" class="btn-update-time" onclick="updateSingleTime('input-start-time-full')"><span style="font-size: 1.1em;">⏱️</span></button>
+                        </div>
+                    </div>
+                    
+                    <div class="time-component">
+                        <label class="input-label">End time (結束時間): (DD/MM/YYYY hh:mm) (IST)</label>
+                        <div class="time-input-row">
+                            <input type="text" id="input-stop-time-full" class="text-input" placeholder="請點右側按鈕或手動輸入" oninput="calculateTotalStopTime()">
+                            <button type="button" class="btn-update-time" onclick="updateSingleTime('input-stop-time-full')"><span style="font-size: 1.1em;">⏱️</span></button>
+                        </div>
+                    </div>
+                    
+                    <div class="input-group">
+                        <label class="input-label">Total time (總時間):</label>
+                        <div class="total-time-input-group">
+                            <input type="text" id="input-total-time" class="text-input" readonly style="background-color: #eee; font-weight: bold;">
+                            <button type="button" class="btn-calc" onclick="calculateTotalStopTime()" title="Recalculate">🔄</button>
+                            <select id="total-time-unit" onchange="calculateTotalStopTime()" class="text-input"><option value="min" selected>min</option><option value="h">hr</option></select>
+                        </div>
+                    </div>
+
+                    <div class="input-group">
+                        <label class="input-label">Truck No (班次):</label>
+                        <input type="text" id="input-truck-num" class="text-input" placeholder="輸入班次 (e.g. 1)">
+                    </div>
+
+                    <div class="input-group">
+                        <label class="input-label">Number of Truck (車牌):</label>
+                        <input type="text" id="input-plate-num" class="text-input" placeholder="輸入車牌號碼">
+                    </div>
+
+                    <div class="input-group">
+                        <label class="input-label">RW Material Weight (原材料重量):</label>
+                        <input type="number" id="input-concern-section" class="text-input" placeholder="Enter Weight" oninput="calculateTotalStock()">
+                    </div>
+                    
+                    <div class="input-group">
+                        <label class="input-label">MX Stock (MX 庫存):</label>
+                        <input type="number" id="input-reason" class="text-input" placeholder="Enter MX Stock" oninput="calculateTotalStock()">
+                    </div>
+                    
+                    <div class="input-group">
+                        <label class="input-label">WH Stock (WH 庫存):</label>
+                        <input type="number" id="input-solution" class="text-input" placeholder="Enter WH Stock" oninput="calculateTotalStock()">
+                    </div>
+
+                    <div class="input-group">
+                        <label class="input-label">Total Stock (總庫存):</label>
+                        <input type="text" id="input-total-stock" class="text-input" readonly style="background-color: #eee; font-weight: bold;" placeholder="Auto Calc">
+                    </div>
+
+                    <div class="input-group">
+                        <label class="input-label">Notes (備註):</label>
+                        <textarea id="input-self-actions"></textarea>
+                        <div class="voice-control-group"><button type="button" class="btn-voice" data-target="input-self-actions" onclick="toggleVoice(this)">🎤 語音輸入</button></div>
+                    </div>
+                </div>
+
+                <div id="recent-records-container" class="card">
+                    <h4>最近紀錄 (Recent Records)</h4> <div id="recent-records-list"><p style="text-align: center; color: #999;">Loading recent records...</p></div>
+                </div>
+                
+                <div class="footer-btns">
+                    <button class="btn-main btn-copy" onclick="copyFormattedInfo()">📋 Copy</button>
+                    <button class="btn-main btn-save" id="saveBtn" onclick="saveToCloud()">💾 Save</button>
+                    <button class="btn-main btn-view" onclick="viewExcel()">📊 Excel</button>
+                    <button class="btn-main btn-drive" onclick="viewDriveFolder()">📂 Photos</button>
+                </div>
+            </div> 
+        </div> 
+    </div>
+
+<script>
+    const MAX_IMAGE_WIDTH = 1000;
+    const MACHINE_LIST_KEY = "cfg_machine_list"; const CONCERN_LIST_KEY = "cfg_concern_list"; const EMPLOYEE_ID_KEY = "cfg_employee_id";
+    const DEFAULT_MACHINE_LIST = [];
+    const DEFAULT_CONCERN_LIST = [];
+    const DEFAULT_VOICE_TIMEOUT = 1.5;
+    const DEFAULT_RECENT_LIMIT = 5;
+
+    // ⚠️⚠️⚠️ 請務必將下方三個 ID 替換為您自己的資料 ⚠️⚠️⚠️
+    const FIXED_SCRIPT_ID = "https://script.google.com/macros/s/AKfycbxX-XRuXqIB7JJopFGYaHtiAk6kZfe19bFihOd7HCxrA-ffKQGXDoIfJwwPYFLZER8c/exec"; 
+    const FIXED_SHEET_ID = "1OFXZ7fb2AU0iN1I0viHmlpykA_v_JEUaSdluqtF-L_c/edit?gid=0#gid=0"; 
+    const FIXED_FOLDER_ID = "1j7Z4EuAFFmdA7w46eoDxun77SD2KxsTe"; 
+      
+    const GAS_URL = FIXED_SCRIPT_ID.startsWith("http") ? FIXED_SCRIPT_ID : `https://script.google.com/macros/s/${FIXED_SCRIPT_ID}/exec`;
+
+    let processedImages = { 1: "", 2: "", 3: "" };
+    let recognition = null, isRecording = false, activeTextAreaId = null;
+    let initialText = "", currentSessionFinal = "", punctuationTimer = null; 
+
+    document.addEventListener('DOMContentLoaded', () => { initApp(); });
+
+    function initApp() {
+        if(!localStorage.getItem(MACHINE_LIST_KEY)) localStorage.setItem(MACHINE_LIST_KEY, JSON.stringify(DEFAULT_MACHINE_LIST));
+        if(!localStorage.getItem(CONCERN_LIST_KEY)) localStorage.setItem(CONCERN_LIST_KEY, JSON.stringify(DEFAULT_CONCERN_LIST));
+        if(!localStorage.getItem("cfg_timeout")) localStorage.setItem("cfg_timeout", DEFAULT_VOICE_TIMEOUT);
+        if(!localStorage.getItem("cfg_recent_limit")) localStorage.setItem("cfg_recent_limit", DEFAULT_RECENT_LIMIT);
+        
+        loadSettingsToUI(); loadEmployeeID(); 
+        
+        document.getElementById('input-stop-time-full').value = ""; document.getElementById('input-start-time-full').value = "";
+        document.getElementById('input-total-time').value = ""; document.getElementById('input-total-time').style.backgroundColor = '#eee';
+        document.getElementById('total-time-unit').value = "min"; 
+        
+        document.getElementById('app-screen').style.display = 'block';
+        applySettings(); loadRecentRecords();
+    }
+
+    function openSettings(){document.getElementById('settings-modal').style.display='flex';}
+    function closeSettings(){document.getElementById('settings-modal').style.display='none'}
+    function saveSettings(){
+        const t=parseFloat(document.getElementById('set-timeout').value);if(!isNaN(t))localStorage.setItem("cfg_timeout",t);
+        const limit = parseInt(document.getElementById('set-recent-limit').value);
+        if(!isNaN(limit) && limit > 0) localStorage.setItem("cfg_recent_limit", limit);
+
+        localStorage.setItem("cfg_ratio",document.getElementById('set-ratio').value);
+        localStorage.setItem("cfg_lang",document.getElementById('set-lang').value);
+        alert("Saved!");closeSettings();applySettings();
+        loadRecentRecords();
+    }
+    function loadSettingsToUI(){
+        document.getElementById('set-timeout').value=localStorage.getItem("cfg_timeout")||DEFAULT_VOICE_TIMEOUT;
+        document.getElementById('set-ratio').value=localStorage.getItem("cfg_ratio")||'4/3';
+        document.getElementById('set-lang').value=localStorage.getItem("cfg_lang")||'cmn-Hant-TW';
+        document.getElementById('set-recent-limit').value = localStorage.getItem("cfg_recent_limit") || DEFAULT_RECENT_LIMIT;
+    }
+    
+    function applySettings(){
+        const r=localStorage.getItem("cfg_ratio")||'4/3';
+        const ratioClass = r==='4/3'?'ratio-4-3':r==='16/9'?'ratio-16-9':r==='9/16'?'ratio-9-16':'ratio-1-1';
+        [1, 2, 3].forEach(num => {
+            const c = document.getElementById(`preview-container_${num}`);
+            if (c) {
+                c.className = 'preview-container-box'; 
+                c.classList.add(ratioClass);
+                document.getElementById(`ratio-display-tag_${num}`).innerText=`Ratio: ${r.replace('/',':')}`;
+            }
+        });
+
+        const l = localStorage.getItem("cfg_lang")||'cmn-Hant-TW';
+        document.getElementById('voice-lang-select').value = l;
+        document.getElementById('set-lang').value = l;
+    }
+    function syncLanguage(){localStorage.setItem("cfg_lang",document.getElementById('set-lang').value);document.getElementById('voice-lang-select').value=document.getElementById('set-lang').value}
+    function syncLanguageToSettings(el){localStorage.setItem("cfg_lang",el.value);document.getElementById('set-lang').value=el.value}
+
+    function loadEmployeeID(){const v=localStorage.getItem(EMPLOYEE_ID_KEY);if(v)document.getElementById('input-employee-id').value=v}
+    function saveEmployeeID(){const v=document.getElementById('input-employee-id').value.trim();if(v)localStorage.setItem(EMPLOYEE_ID_KEY,v)}
+    
+    const DATETIME_REGEX = /^(\d{2})\/(\d{2})\/(\d{4}) (\d{2}):(\d{2})$/;
+    function parseCustomDateTime(dtStr) {
+        if(!dtStr) return null;
+        const s = dtStr.trim(); 
+        const match = s.match(DATETIME_REGEX);
+        if (!match) return null;
+        const day = parseInt(match[1], 10);
+        const month = parseInt(match[2], 10) - 1; 
+        const year = parseInt(match[3], 10);
+        const hour = parseInt(match[4], 10);
+        const minute = parseInt(match[5], 10);
+        const date = new Date(year, month, day, hour, minute);
+        if (date.getFullYear() !== year || date.getMonth() !== month || date.getDate() !== day) return null;
+        return date;
+    }
+    
+    function calculateTotalStopTime() {
+        const s1 = document.getElementById('input-start-time-full').value; 
+        const s2 = document.getElementById('input-stop-time-full').value; 
+        const t = document.getElementById('input-total-time');
+        const u = document.getElementById('total-time-unit').value;
+        if(!s1||!s2){ t.value=""; t.style.background='#eee'; return; }
+        const d1 = parseCustomDateTime(s1);
+        const d2 = parseCustomDateTime(s2);
+        if(!d1||!d2){ t.value="Invalid Format"; t.style.background='#fdd'; return; }
+        
+        const diff = Math.round((d2 - d1) / 60000);
+        
+        if(diff <= 0){ t.value="0 (Check Time)"; t.style.background='#fdd'; return; }
+        t.value = u === 'h' ? (diff/60).toFixed(2) + " hr" : diff + " min";
+        t.style.background='#e6ffed';
+    }
+
+    function calculateTotalStock() {
+        const inbound = parseFloat(document.getElementById('input-concern-section').value) || 0; 
+        const mxStock = parseFloat(document.getElementById('input-reason').value) || 0; 
+        const whStock = parseFloat(document.getElementById('input-solution').value) || 0; 
+        
+        const total = inbound + mxStock + whStock;
+        document.getElementById('input-total-stock').value = total;
+    }
+    
+    function getFullDateTimeString(dateObj) {
+        const utc = dateObj.getTime() + (dateObj.getTimezoneOffset() * 60000);
+        const istDate = new Date(utc + (3600000 * 5.5));
+        const day = String(istDate.getDate()).padStart(2, '0');
+        const month = String(istDate.getMonth() + 1).padStart(2, '0');
+        const year = istDate.getFullYear();
+        const hour = String(istDate.getHours()).padStart(2, '0');
+        const minute = String(istDate.getMinutes()).padStart(2, '0');
+        return `${day}/${month}/${year} ${hour}:${minute}`;
+    }
+    function updateSingleTime(id){const n=new Date();document.getElementById(id).value=getFullDateTimeString(n);calculateTotalStopTime()}
+    
+    function loadRecentRecords(){
+        const listContainer=document.getElementById('recent-records-list');listContainer.innerHTML='<p style="text-align: center; color: #999;">Loading...</p>';
+        const limit = parseInt(localStorage.getItem("cfg_recent_limit")) || DEFAULT_RECENT_LIMIT;
+
+        fetch(`${GAS_URL}?action=loadRecords`).then(r=>r.json()).then(res=>{
+            listContainer.innerHTML='';
+            if(res.result==='success'&&res.data.length>0){
+                const recordsToShow = res.data.slice(0, limit);
+                recordsToShow.forEach(r=>{
+                    const i=document.createElement('div');i.className='record-item';
+                    
+                    // ⭐ 使用 formNo + startTime 作為唯一識別
+                    i.setAttribute('onclick', `populateForm('${r.formNo}', '${r.startTime}')`);
+                    
+                    i.innerHTML=`<div class="main-info-group"><span class="form-no-display">#${r.formNo||'N/A'}</span><span class="stop-time-display">🛑 ${r.stopTime||"No Time"}</span></div><div class="details"><div>${r.machine||'N/A'} - ${r.truckNum||'No Plate'}</div><div>${r.startTime?'Arr: '+r.startTime:''}</div></div>`;
+                    listContainer.appendChild(i)
+                })
+            }else{listContainer.innerHTML='<p style="text-align: center; color: #999;">無最近紀錄。</p>'}
+        }).catch(e=>{listContainer.innerHTML='<p style="text-align: center; color: red;">❌ 載入失敗。</p>'})
+    }
+
+    function populateForm(f, t){
+        if(!confirm(`回填單號 [${f}]?`))return;showStatus('loading','Loading...',f);
+        
+        // ⭐ 傳送 startTime 參數
+        fetch(`${GAS_URL}?action=getRow&formNo=${encodeURIComponent(f)}&startTime=${encodeURIComponent(t||'')}`).then(r=>r.json()).then(res=>{
+            if(res.result==='success'){
+                const d=res.data;
+                processedImages = { 1: "", 2: "", 3: "" };
+                [1, 2, 3].forEach(num => {
+                      document.getElementById(`preview-img_${num}`).style.display='none';
+                      document.getElementById(`placeholder_${num}`).style.display='block';
+                });
+
+                document.getElementById('input-employee-id').value=d.employeeId;
+                document.getElementById('input-machine').value=d.machine; 
+                document.getElementById('input-form-no').value=d.formNo; 
+                
+                document.getElementById('input-stop-time-full').value=d.stopTimeFull?d.stopTimeFull.trim():"";
+                document.getElementById('input-start-time-full').value=d.startTimeFull?d.startTimeFull.trim():"";
+                
+                document.getElementById('input-concern-section').value=d.concernSection;
+                document.getElementById('input-reason').value=d.reason;
+                document.getElementById('input-solution').value=d.solution;
+                document.getElementById('input-self-actions').value=d.selfActions;
+                
+                document.getElementById('input-plate-num').value = d.plateNum || ""; 
+                document.getElementById('input-truck-num').value = d.shiftNum || ""; 
+
+                calculateTotalStopTime();
+                calculateTotalStock(); 
+                showStatus('success','Loaded','');setTimeout(closeStatusModal,1000)
+            }else{showStatus('error','Failed',res.error)}
+        }).catch(e=>showStatus('error','Error','Network'))
+    }
+    
+    function triggerFile(id){document.getElementById(id).click()}
+
+    function handleFile(i, slotNum){
+        if(i.files[0]){
+            showStatus('loading','Processing...','');
+            const r=new FileReader();
+            r.onload=e=>{const img=new Image();img.onload=()=>processImageWithCanvas(img, slotNum);img.src=e.target.result};
+            r.readAsDataURL(i.files[0])
+        }
+    }
+    function processImageWithCanvas(img, slotNum){
+        const c=document.createElement('canvas');let w=img.width;let h=img.height;if(w>MAX_IMAGE_WIDTH){h=Math.round(h*(MAX_IMAGE_WIDTH/w));w=MAX_IMAGE_WIDTH}c.width=w;c.height=h;c.getContext('2d').drawImage(img,0,0,w,h);
+        processedImages[slotNum] = c.toDataURL('image/jpeg',0.8);
+        document.getElementById(`preview-img_${slotNum}`).src = processedImages[slotNum];
+        document.getElementById(`preview-img_${slotNum}`).style.display='block';
+        document.getElementById(`placeholder_${slotNum}`).style.display='none';
+        closeStatusModal();
+    }
+    
+    function toggleVoice(button) {
+        if (!('webkitSpeechRecognition' in window)) { alert("請使用 Chrome 瀏覽器"); return; }
+        if (isRecording) { manualStopVoice(); } else { activeTextAreaId = button.dataset.target; startVoice(button); }
+    }
+
+    function startVoice(button) {
+        isRecording = true; button.classList.add('recording'); button.innerHTML = '🔴 錄音中...';
+        recognition = new webkitSpeechRecognition(); recognition.continuous = true; recognition.interimResults = true;
+        recognition.lang = document.getElementById('voice-lang-select').value; 
+        
+        const targetElement = document.getElementById(activeTextAreaId);
+        
+        initialText = targetElement.value; 
+        if (initialText.length > 0 && !initialText.endsWith(' ') && !initialText.endsWith('\n')) {
+            initialText += ' ';
+        }
+        currentSessionFinal = ''; 
+
+        recognition.onstart = function() { clearTimeout(punctuationTimer); };
+
+        recognition.onresult = function(event) {
+            clearTimeout(punctuationTimer); 
+            let interimTranscript = '';
+            currentSessionFinal = ''; 
+
+            for (let i = event.resultIndex; i < event.results.length; ++i) {
+                if (event.results[i].isFinal) { 
+                    currentSessionFinal += event.results[i][0].transcript; 
+                } else { 
+                    interimTranscript += event.results[i][0].transcript; 
+                }
+            }
+            targetElement.value = initialText + currentSessionFinal + interimTranscript;
+            
+            const timeout = parseFloat(localStorage.getItem("cfg_timeout") || DEFAULT_VOICE_TIMEOUT) * 1000;
+            punctuationTimer = setTimeout(manualStopVoice, timeout);
+        };
+
+        recognition.onerror = function(event) {
+            console.error('Error:', event.error);
+            if(event.error === 'no-speech') { }
+            else { resetVoiceUI(); alert('語音錯誤: ' + event.error); }
+        };
+
+        recognition.onend = function() {
+            if (isRecording) {
+                try { 
+                    const el = document.getElementById(activeTextAreaId);
+                    if(el) {
+                        initialText = el.value;
+                        if (initialText.length > 0 && !initialText.endsWith(' ') && !initialText.endsWith('\n')) { initialText += ' '; }
+                    }
+                    currentSessionFinal = '';
+                    recognition.start(); 
+                } catch(e) { console.warn("Restart failed"); }
+            } else {
+                resetVoiceUI();
+            }
+        };
+
+        try { recognition.start(); } catch(e) { console.warn("Start failed"); }
+    }
+
+    function manualStopVoice() {
+        isRecording = false; 
+        if (recognition) { 
+            clearTimeout(punctuationTimer); 
+            recognition.stop(); 
+        }
+        resetVoiceUI();
+    }
+
+    function resetVoiceUI() {
+        isRecording = false; document.querySelectorAll('.btn-voice').forEach(b=>{b.classList.remove('recording');b.innerText='🎤 語音輸入'}); activeTextAreaId = null;
+    }
+
+    function showStatus(t,h,s){const m=document.getElementById('status-modal');document.getElementById('status-text').innerText=h;document.getElementById('status-subtext').innerText=s;document.getElementById('status-spinner').style.display=t==='loading'?'block':'none';document.getElementById('status-icon').style.display=t!=='loading'?'block':'none';document.getElementById('status-close-btn').style.display=t!=='loading'?'block':'none';document.getElementById('status-icon').innerText=t==='success'?'✅':'❌';m.style.display='flex'}
+    function closeStatusModal(){document.getElementById('status-modal').style.display='none'}
+    
+    function copyFormattedInfo(){
+        calculateTotalStopTime();
+        calculateTotalStock();
+
+        const emp = document.getElementById('input-employee-id').value || "N/A";
+        const sapCode = document.getElementById('input-machine').value || "N/A";
+        const material = document.getElementById('input-form-no').value || "N/A";
+        const arrTime = document.getElementById('input-start-time-full').value || "";
+        const endTime = document.getElementById('input-stop-time-full').value || "";
+        const totalTime = document.getElementById('input-total-time').value || "N/A";
+
+        const shiftNum = document.getElementById('input-truck-num').value || "N/A"; 
+        const plateNum = document.getElementById('input-plate-num').value || "N/A"; 
+        
+        const inboundWeight = document.getElementById('input-concern-section').value || "N/A";
+        const mxStock = document.getElementById('input-reason').value || "N/A";
+        const whStock = document.getElementById('input-solution').value || "N/A";
+        const totalStock = document.getElementById('input-total-stock').value || "N/A";
+        const notes = document.getElementById('input-self-actions').value || "";
+
+        if (sapCode === "N/A" && material === "N/A") {
+            alert("請至少填寫 SAP CODE 與 Material Name");
+            return;
+        }
+
+        const textToCopy = 
+`【Container Record】
+  
+SAP CODE:
+${sapCode}
+
+Material Name :
+${material}
+
+-----------------------
+Arrival Time :
+${arrTime}
+
+End time :
+${endTime}
+
+Total time : ${totalTime}
+
+---------------------
+Truck No: ${shiftNum}
+
+Number of Truck : 
+${plateNum}
+
+---------------------
+RW Material Weight:
+${inboundWeight}
+
+MX Stock: ${mxStock}
+WH Stock: ${whStock}
+
+Total Stock: ${totalStock}
+
+--------------------
+ID_${emp} :
+${notes}`;
+
+        navigator.clipboard.writeText(textToCopy.trim())
+            .then(() => alert("Copied! (已複製)"))
+            .catch(err => alert("Copy failed: " + err));
+    }
+
+    function viewExcel(){window.open(`https://docs.google.com/spreadsheets/d/${FIXED_SHEET_ID}/edit`,'_blank')}
+    function viewDriveFolder(){window.open(`https://drive.google.com/drive/folders/${FIXED_FOLDER_ID}`,'_blank')}
+    
+    function clearInputs(){
+        document.getElementById('input-machine').value="";
+        document.getElementById('input-form-no').value="";
+        document.getElementById('input-stop-time-full').value="";
+        document.getElementById('input-start-time-full').value="";
+        document.getElementById('input-total-time').value="";
+        document.getElementById('input-truck-num').value="";
+        document.getElementById('input-plate-num').value=""; 
+        document.getElementById('input-concern-section').value="";
+        document.getElementById('input-reason').value="";
+        document.getElementById('input-solution').value="";
+        document.getElementById('input-total-stock').value="";
+        document.getElementById('input-self-actions').value="";
+        
+        processedImages = { 1: "", 2: "", 3: "" };
+        [1, 2, 3].forEach(num => {
+             document.getElementById(`preview-img_${num}`).style.display='none';
+             document.getElementById(`preview-img_${num}`).src="";
+             document.getElementById(`placeholder_${num}`).style.display='block';
+        });
+        
+        calculateTotalStopTime();
+    }
+
+    function saveToCloud(){
+        if(isRecording)manualStopVoice();
+        
+        let noteContent = document.getElementById('input-self-actions').value;
+        const plateNum = document.getElementById('input-plate-num').value; 
+        const shiftNum = document.getElementById('input-truck-num').value; 
+
+        const d={
+            image1: processedImages[1],
+            image2: processedImages[2],
+            image3: processedImages[3], 
+            employeeId:document.getElementById('input-employee-id').value,
+            machine:document.getElementById('input-machine').value,
+            formNo:document.getElementById('input-form-no').value,
+            startTimeFull:document.getElementById('input-start-time-full').value,
+            stopTimeFull:document.getElementById('input-stop-time-full').value,
+            
+            truckNum: plateNum, // 對應 I欄
+            shiftNum: shiftNum, // 對應 J欄
+            
+            concernSection:document.getElementById('input-concern-section').value,
+            reason:document.getElementById('input-reason').value,
+            solution:document.getElementById('input-solution').value,
+            selfActions:noteContent, 
+            folderId:FIXED_FOLDER_ID
+        };
+        
+        if(!d.formNo){alert("Material Name required");return}
+        saveEmployeeID();showStatus('loading','Uploading...','');
+        fetch(GAS_URL,{method:'POST',body:JSON.stringify(d)}).then(r=>r.json()).then(res=>{if(res.result==='success'){showStatus('success','Saved!',res.action);clearInputs();loadRecentRecords();setTimeout(closeStatusModal,2000)}else{showStatus('error','Failed',res.error)}}).catch(e=>showStatus('error','Error',e.message)).finally(()=>document.getElementById('saveBtn').disabled=false);
+    }
+</script>
+</body>
+</html>
+
