@@ -616,4 +616,181 @@
     }
 
     function resetVoiceUI() {
-        isRecording = false; document.querySelectorAll('.btn-voice').forEach(b=>{b.classList.remove('recording');b.innerText='🎤 語音輸入'}); activeTextAreaId = null
+        isRecording = false; document.querySelectorAll('.btn-voice').forEach(b=>{b.classList.remove('recording');b.innerText='🎤 語音輸入'}); activeTextAreaId = null;
+    }
+
+    function showStatus(t,h,s){const m=document.getElementById('status-modal');document.getElementById('status-text').innerText=h;document.getElementById('status-subtext').innerText=s;document.getElementById('status-spinner').style.display=t==='loading'?'block':'none';document.getElementById('status-icon').style.display=t!=='loading'?'block':'none';document.getElementById('status-close-btn').style.display=t!=='loading'?'block':'none';document.getElementById('status-icon').innerText=t==='success'?'✅':'❌';m.style.display='flex'}
+    function closeStatusModal(){document.getElementById('status-modal').style.display='none'}
+    
+    function copyFormattedInfo(){
+        calculateTotalStopTime();
+        calculateTotalStock();
+
+        const emp = document.getElementById('input-employee-id').value || "N/A";
+        const sapCode = document.getElementById('input-machine').value || "N/A";
+        const material = document.getElementById('input-form-no').value || "N/A";
+        const arrTime = document.getElementById('input-start-time-full').value || "";
+        const endTime = document.getElementById('input-stop-time-full').value || "";
+        const totalTime = document.getElementById('input-total-time').value || "N/A";
+
+        const shiftNum = document.getElementById('input-truck-num').value || "N/A"; 
+        const plateNum = document.getElementById('input-plate-num').value || "N/A"; 
+        
+        const inboundWeight = document.getElementById('input-concern-section').value || "N/A";
+        const mxStock = document.getElementById('input-reason').value || "N/A";
+        const whStock = document.getElementById('input-solution').value || "N/A";
+        const totalStock = document.getElementById('input-total-stock').value || "N/A";
+        const notes = document.getElementById('input-self-actions').value || "";
+
+        if (sapCode === "N/A" && material === "N/A") {
+            alert("請至少填寫 SAP CODE 與 Material Name");
+            return;
+        }
+
+        const textToCopy = 
+`【Container Record】
+  
+SAP CODE:
+${sapCode}
+
+Material Name :
+${material}
+
+-----------------------
+Arrival Time :
+${arrTime}
+
+End time :
+${endTime}
+
+Total time : ${totalTime}
+
+---------------------
+Truck No: ${shiftNum}
+
+Number of Truck : 
+${plateNum}
+
+---------------------
+RW Material Weight:
+${inboundWeight}
+
+MX Stock: ${mxStock}
+WH Stock: ${whStock}
+
+Total Stock: ${totalStock}
+
+--------------------
+ID_${emp} :
+${notes}`;
+
+        navigator.clipboard.writeText(textToCopy.trim())
+            .then(() => alert("Copied! (已複製)"))
+            .catch(err => alert("Copy failed: " + err));
+    }
+
+    function viewExcel(){window.open(`https://docs.google.com/spreadsheets/d/${FIXED_SHEET_ID}/edit`,'_blank')}
+    function viewDriveFolder(){window.open(`https://drive.google.com/drive/folders/${FIXED_FOLDER_ID}`,'_blank')}
+    
+    function clearInputs(){
+        document.getElementById('input-machine').value="";
+        document.getElementById('input-form-no').value="";
+        document.getElementById('input-stop-time-full').value="";
+        document.getElementById('input-start-time-full').value="";
+        document.getElementById('input-total-time').value="";
+        document.getElementById('input-truck-num').value="";
+        document.getElementById('input-plate-num').value=""; 
+        document.getElementById('input-concern-section').value="";
+        document.getElementById('input-reason').value="";
+        document.getElementById('input-solution').value="";
+        document.getElementById('input-total-stock').value="";
+        document.getElementById('input-self-actions').value="";
+        
+        processedImages = { 1: "", 2: "", 3: "" };
+        [1, 2, 3].forEach(num => {
+             document.getElementById(`preview-img_${num}`).style.display='none';
+             document.getElementById(`preview-img_${num}`).src="";
+             document.getElementById(`placeholder_${num}`).style.display='block';
+        });
+        
+        calculateTotalStopTime();
+    }
+
+    function saveToCloud(){
+        if(isRecording)manualStopVoice();
+        
+        let noteContent = document.getElementById('input-self-actions').value;
+        const plateNum = document.getElementById('input-plate-num').value; 
+        const shiftNum = document.getElementById('input-truck-num').value; 
+
+        // TWO-STEP VALIDATION
+        const pic1 = processedImages[1];
+        const pic2 = processedImages[2];
+        const pic3 = processedImages[3];
+        const startTime = document.getElementById('input-start-time-full').value;
+        const endTime = document.getElementById('input-stop-time-full').value;
+        const formNo = document.getElementById('input-form-no').value;
+
+        if (!formNo) {
+            alert("Material Name (Form Number) is required to track this container.");
+            return;
+        }
+
+        const isDepartureStep = pic3 || endTime;
+
+        if (!isDepartureStep) {
+            // STEP 1: ARRIVAL
+            if (!pic1 || !pic2 || !startTime) {
+                alert("ARRIVAL ERROR: You must upload Picture 1 (Truck Plate), Picture 2 (Material), and set an Arrival Time!");
+                return;
+            }
+        } else {
+            // STEP 2: DEPARTURE
+            if (!pic3 || !endTime) {
+                alert("DEPARTURE ERROR: You are missing Picture 3 (Empty Container) or the End Time!");
+                return;
+            }
+        }
+
+        const d={
+            image1: pic1,
+            image2: pic2,
+            image3: pic3, 
+            employeeId:document.getElementById('input-employee-id').value,
+            machine:document.getElementById('input-machine').value,
+            formNo:formNo,
+            startTimeFull:startTime,
+            stopTimeFull:endTime,
+            totalTime:document.getElementById('input-total-time').value, // <--- SAVES THE TOTAL TIME
+            
+            truckNum: plateNum, 
+            shiftNum: shiftNum, 
+            
+            concernSection:document.getElementById('input-concern-section').value,
+            reason:document.getElementById('input-reason').value,
+            solution:document.getElementById('input-solution').value,
+            selfActions:noteContent, 
+            folderId:FIXED_FOLDER_ID
+        };
+        
+        saveEmployeeID();showStatus('loading','Uploading...','');
+        document.getElementById('saveBtn').disabled=true;
+        
+        fetch(GAS_URL,{method:'POST',body:JSON.stringify(d)})
+        .then(r=>r.json())
+        .then(res=>{
+            if(res.result==='success'){
+                showStatus('success','Saved!',res.action);
+                clearInputs();
+                loadRecentRecords();
+                setTimeout(closeStatusModal,2000)
+            }else{
+                showStatus('error','Failed',res.error)
+            }
+        })
+        .catch(e=>showStatus('error','Error',e.message))
+        .finally(()=>document.getElementById('saveBtn').disabled=false);
+    }
+</script>
+</body>
+</html>
