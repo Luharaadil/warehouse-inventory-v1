@@ -335,8 +335,9 @@
     const DEFAULT_VOICE_TIMEOUT = 1.5;
     const DEFAULT_RECENT_LIMIT = 5;
 
-    // ⚠️⚠️⚠️ 請務必將下方三個 ID 替換為您自己的資料 ⚠️⚠️⚠️
-    const FIXED_SCRIPT_ID = "https://script.google.com/macros/s/AKfycbxX-XRuXqIB7JJopFGYaHtiAk6kZfe19bFihOd7HCxrA-ffKQGXDoIfJwwPYFLZER8c/exec"; 
+    // ⚠️⚠️⚠️ 新的 Google Apps Script URL ⚠️⚠️⚠️
+    const FIXED_SCRIPT_ID = "https://script.google.com/macros/s/AKfycbyUXgSeXH_fxRaL0vuWnJsW9r3zg2kUbzMEe5Hhio-Q_2j1dmXsOU0XnHvzNKO_PRk/exec"; 
+    
     const FIXED_SHEET_ID = "1OFXZ7fb2AU0iN1I0viHmlpykA_v_JEUaSdluqtF-L_c/edit?gid=0#gid=0"; 
     const FIXED_FOLDER_ID = "1j7Z4EuAFFmdA7w46eoDxun77SD2KxsTe"; 
       
@@ -385,7 +386,7 @@
     
     function applySettings(){
         const r=localStorage.getItem("cfg_ratio")||'4/3';
-        const ratioClass = r==='4/3'?'ratio-4-3':r==='16/9'?'ratio-16-9':r==='9/16'?'ratio-9-16':'ratio-1-1';
+        const ratioClass = r==='4/3'?'ratio-4-3':r==='16/9'?'ratio-9-16':'ratio-1-1';
         [1, 2, 3].forEach(num => {
             const c = document.getElementById(`preview-container_${num}`);
             if (c) {
@@ -714,15 +715,47 @@ ${notes}`;
         const plateNum = document.getElementById('input-plate-num').value; 
         const shiftNum = document.getElementById('input-truck-num').value; 
 
+        // ----------------------------------------------------
+        // TWO-STEP VALIDATION LOGIC ADDED HERE
+        // ----------------------------------------------------
+        const pic1 = processedImages[1];
+        const pic2 = processedImages[2];
+        const pic3 = processedImages[3];
+        const startTime = document.getElementById('input-start-time-full').value;
+        const endTime = document.getElementById('input-stop-time-full').value;
+        const formNo = document.getElementById('input-form-no').value;
+
+        if (!formNo) {
+            alert("Material Name (Form Number) is required to track this container.");
+            return;
+        }
+
+        const isDepartureStep = pic3 || endTime;
+
+        if (!isDepartureStep) {
+            // STEP 1: ARRIVAL
+            if (!pic1 || !pic2 || !startTime) {
+                alert("ARRIVAL ERROR: You must upload Picture 1 (Truck Plate), Picture 2 (Material), and set an Arrival Time!");
+                return;
+            }
+        } else {
+            // STEP 2: DEPARTURE
+            if (!pic3 || !endTime) {
+                alert("DEPARTURE ERROR: You are missing Picture 3 (Empty Container) or the End Time!");
+                return;
+            }
+        }
+        // ----------------------------------------------------
+
         const d={
-            image1: processedImages[1],
-            image2: processedImages[2],
-            image3: processedImages[3], 
+            image1: pic1,
+            image2: pic2,
+            image3: pic3, 
             employeeId:document.getElementById('input-employee-id').value,
             machine:document.getElementById('input-machine').value,
-            formNo:document.getElementById('input-form-no').value,
-            startTimeFull:document.getElementById('input-start-time-full').value,
-            stopTimeFull:document.getElementById('input-stop-time-full').value,
+            formNo:formNo,
+            startTimeFull:startTime,
+            stopTimeFull:endTime,
             
             truckNum: plateNum, // 對應 I欄
             shiftNum: shiftNum, // 對應 J欄
@@ -734,11 +767,26 @@ ${notes}`;
             folderId:FIXED_FOLDER_ID
         };
         
-        if(!d.formNo){alert("Material Name required");return}
-        saveEmployeeID();showStatus('loading','Uploading...','');
-        fetch(GAS_URL,{method:'POST',body:JSON.stringify(d)}).then(r=>r.json()).then(res=>{if(res.result==='success'){showStatus('success','Saved!',res.action);clearInputs();loadRecentRecords();setTimeout(closeStatusModal,2000)}else{showStatus('error','Failed',res.error)}}).catch(e=>showStatus('error','Error',e.message)).finally(()=>document.getElementById('saveBtn').disabled=false);
+        saveEmployeeID();
+        showStatus('loading','Uploading...','');
+        
+        document.getElementById('saveBtn').disabled = true;
+
+        fetch(GAS_URL,{method:'POST',body:JSON.stringify(d)})
+        .then(r=>r.json())
+        .then(res=>{
+            if(res.result==='success'){
+                showStatus('success','Saved!',res.action);
+                clearInputs();
+                loadRecentRecords();
+                setTimeout(closeStatusModal,2000)
+            } else {
+                showStatus('error','Failed',res.error)
+            }
+        })
+        .catch(e=>showStatus('error','Error',e.message))
+        .finally(()=>document.getElementById('saveBtn').disabled = false);
     }
 </script>
 </body>
 </html>
-
