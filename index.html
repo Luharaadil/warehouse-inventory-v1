@@ -252,7 +252,7 @@
                     </div>
                     
                     <div class="time-component">
-                        <label class="input-label">Arrival Time (到達時間): (DD/MM/YYYY hh:mm) (IST)</label>
+                        <label class="input-label">Arrival Time (到達時間): (YYYY-MM-DD hh:mm)</label>
                         <div class="time-input-row">
                             <input type="text" id="input-start-time-full" class="text-input" placeholder="請點右側按鈕或手動輸入" oninput="calculateTotalStopTime()">
                             <button type="button" class="btn-update-time" onclick="updateSingleTime('input-start-time-full')"><span style="font-size: 1.1em;">⏱️</span></button>
@@ -260,7 +260,7 @@
                     </div>
                     
                     <div class="time-component">
-                        <label class="input-label">End time (結束時間): (DD/MM/YYYY hh:mm) (IST)</label>
+                        <label class="input-label">End time (結束時間): (YYYY-MM-DD hh:mm)</label>
                         <div class="time-input-row">
                             <input type="text" id="input-stop-time-full" class="text-input" placeholder="請點右側按鈕或手動輸入" oninput="calculateTotalStopTime()">
                             <button type="button" class="btn-update-time" onclick="updateSingleTime('input-stop-time-full')"><span style="font-size: 1.1em;">⏱️</span></button>
@@ -335,9 +335,7 @@
     const DEFAULT_VOICE_TIMEOUT = 1.5;
     const DEFAULT_RECENT_LIMIT = 5;
 
-    // ⚠️⚠️⚠️ 新的 Google Apps Script URL ⚠️⚠️⚠️
-    const FIXED_SCRIPT_ID = "https://script.google.com/macros/s/AKfycbyUXgSeXH_fxRaL0vuWnJsW9r3zg2kUbzMEe5Hhio-Q_2j1dmXsOU0XnHvzNKO_PRk/exec"; 
-    
+    const FIXED_SCRIPT_ID = "https://script.google.com/macros/s/AKfycbxX-XRuXqIB7JJopFGYaHtiAk6kZfe19bFihOd7HCxrA-ffKQGXDoIfJwwPYFLZER8c/exec"; 
     const FIXED_SHEET_ID = "1OFXZ7fb2AU0iN1I0viHmlpykA_v_JEUaSdluqtF-L_c/edit?gid=0#gid=0"; 
     const FIXED_FOLDER_ID = "1j7Z4EuAFFmdA7w46eoDxun77SD2KxsTe"; 
       
@@ -386,7 +384,7 @@
     
     function applySettings(){
         const r=localStorage.getItem("cfg_ratio")||'4/3';
-        const ratioClass = r==='4/3'?'ratio-4-3':r==='16/9'?'ratio-9-16':'ratio-1-1';
+        const ratioClass = r==='4/3'?'ratio-4-3':r==='16/9'?'ratio-16-9':r==='9/16'?'ratio-9-16':'ratio-1-1';
         [1, 2, 3].forEach(num => {
             const c = document.getElementById(`preview-container_${num}`);
             if (c) {
@@ -406,15 +404,17 @@
     function loadEmployeeID(){const v=localStorage.getItem(EMPLOYEE_ID_KEY);if(v)document.getElementById('input-employee-id').value=v}
     function saveEmployeeID(){const v=document.getElementById('input-employee-id').value.trim();if(v)localStorage.setItem(EMPLOYEE_ID_KEY,v)}
     
-    const DATETIME_REGEX = /^(\d{2})\/(\d{2})\/(\d{4}) (\d{2}):(\d{2})$/;
+    // UPDATED FORMAT: YYYY-MM-DD HH:mm (Universally accepted by Google Sheets)
+    const DATETIME_REGEX = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2})$/;
+    
     function parseCustomDateTime(dtStr) {
         if(!dtStr) return null;
         const s = dtStr.trim(); 
         const match = s.match(DATETIME_REGEX);
         if (!match) return null;
-        const day = parseInt(match[1], 10);
+        const year = parseInt(match[1], 10);
         const month = parseInt(match[2], 10) - 1; 
-        const year = parseInt(match[3], 10);
+        const day = parseInt(match[3], 10);
         const hour = parseInt(match[4], 10);
         const minute = parseInt(match[5], 10);
         const date = new Date(year, month, day, hour, minute);
@@ -448,6 +448,7 @@
         document.getElementById('input-total-stock').value = total;
     }
     
+    // OUTPUT UPDATED TO YYYY-MM-DD HH:mm
     function getFullDateTimeString(dateObj) {
         const utc = dateObj.getTime() + (dateObj.getTimezoneOffset() * 60000);
         const istDate = new Date(utc + (3600000 * 5.5));
@@ -456,8 +457,9 @@
         const year = istDate.getFullYear();
         const hour = String(istDate.getHours()).padStart(2, '0');
         const minute = String(istDate.getMinutes()).padStart(2, '0');
-        return `${day}/${month}/${year} ${hour}:${minute}`;
+        return `${year}-${month}-${day} ${hour}:${minute}`;
     }
+    
     function updateSingleTime(id){const n=new Date();document.getElementById(id).value=getFullDateTimeString(n);calculateTotalStopTime()}
     
     function loadRecentRecords(){
@@ -471,7 +473,6 @@
                 recordsToShow.forEach(r=>{
                     const i=document.createElement('div');i.className='record-item';
                     
-                    // ⭐ 使用 formNo + startTime 作為唯一識別
                     i.setAttribute('onclick', `populateForm('${r.formNo}', '${r.startTime}')`);
                     
                     i.innerHTML=`<div class="main-info-group"><span class="form-no-display">#${r.formNo||'N/A'}</span><span class="stop-time-display">🛑 ${r.stopTime||"No Time"}</span></div><div class="details"><div>${r.machine||'N/A'} - ${r.truckNum||'No Plate'}</div><div>${r.startTime?'Arr: '+r.startTime:''}</div></div>`;
@@ -484,7 +485,6 @@
     function populateForm(f, t){
         if(!confirm(`回填單號 [${f}]?`))return;showStatus('loading','Loading...',f);
         
-        // ⭐ 傳送 startTime 參數
         fetch(`${GAS_URL}?action=getRow&formNo=${encodeURIComponent(f)}&startTime=${encodeURIComponent(t||'')}`).then(r=>r.json()).then(res=>{
             if(res.result==='success'){
                 const d=res.data;
@@ -715,9 +715,7 @@ ${notes}`;
         const plateNum = document.getElementById('input-plate-num').value; 
         const shiftNum = document.getElementById('input-truck-num').value; 
 
-        // ----------------------------------------------------
-        // TWO-STEP VALIDATION LOGIC ADDED HERE
-        // ----------------------------------------------------
+        // TWO-STEP VALIDATION
         const pic1 = processedImages[1];
         const pic2 = processedImages[2];
         const pic3 = processedImages[3];
@@ -745,7 +743,6 @@ ${notes}`;
                 return;
             }
         }
-        // ----------------------------------------------------
 
         const d={
             image1: pic1,
@@ -756,9 +753,10 @@ ${notes}`;
             formNo:formNo,
             startTimeFull:startTime,
             stopTimeFull:endTime,
+            totalTime:document.getElementById('input-total-time').value, // <-- ADDED TOTAL TIME
             
-            truckNum: plateNum, // 對應 I欄
-            shiftNum: shiftNum, // 對應 J欄
+            truckNum: plateNum, 
+            shiftNum: shiftNum, 
             
             concernSection:document.getElementById('input-concern-section').value,
             reason:document.getElementById('input-reason').value,
@@ -767,11 +765,9 @@ ${notes}`;
             folderId:FIXED_FOLDER_ID
         };
         
-        saveEmployeeID();
-        showStatus('loading','Uploading...','');
+        saveEmployeeID();showStatus('loading','Uploading...','');
+        document.getElementById('saveBtn').disabled=true;
         
-        document.getElementById('saveBtn').disabled = true;
-
         fetch(GAS_URL,{method:'POST',body:JSON.stringify(d)})
         .then(r=>r.json())
         .then(res=>{
@@ -780,12 +776,12 @@ ${notes}`;
                 clearInputs();
                 loadRecentRecords();
                 setTimeout(closeStatusModal,2000)
-            } else {
+            }else{
                 showStatus('error','Failed',res.error)
             }
         })
         .catch(e=>showStatus('error','Error',e.message))
-        .finally(()=>document.getElementById('saveBtn').disabled = false);
+        .finally(()=>document.getElementById('saveBtn').disabled=false);
     }
 </script>
 </body>
